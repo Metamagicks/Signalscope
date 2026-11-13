@@ -1,0 +1,37 @@
+name: Build Android APK
+on:
+  push:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unzip project
+        run: |
+          test -f signalscope.zip || { echo "Upload signalscope.zip to the repo first"; exit 1; }
+          unzip -q -o signalscope.zip -d build
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install packages
+        working-directory: build/signalscope
+        run: npm ci || npm install
+      - name: Generate Android project
+        working-directory: build/signalscope
+        run: npx expo prebuild -p android --no-install
+      - name: Build APK
+        working-directory: build/signalscope/android
+        run: ./gradlew assembleRelease --no-daemon
+      - name: Publish APK as a release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: SignalScope build ${{ github.run_number }}
+          files: build/signalscope/android/app/build/outputs/apk/release/app-release.apk
